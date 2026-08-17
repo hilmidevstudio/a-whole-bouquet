@@ -61,30 +61,35 @@ class Turtle {
 
 // ---------- build a flower's line-segment path ----------
 // each flower = stem (bottom to top), a couple leaves, then a bloom made of
-// looping petal curves approximated as short turtle segments (like a rose curve)
-function buildFlower(baseX, baseY, scale, colorSet, seed) {
+// looping petal curves approximated as short turtle segments (like a rose curve).
+// tipX/tipY is where the bloom ends up; the stem curves there from a shared
+// "tied" base point so the whole set reads as one bouquet, not a scattered field.
+function buildFlower(tieX, tieY, tipX, tipY, scale, colorSet, seed) {
   const segments = [];
-  const stemHeight = 150 * scale;
-  const topX = baseX;
-  const topY = baseY - stemHeight;
 
-  // stem: gentle S-curve via a few short segments
+  // stem: curve from the shared tie point up to the bloom position, with a
+  // little organic sway rather than a straight line
   const stemSteps = 22;
-  let prevX = baseX, prevY = baseY;
+  let prevX = tieX, prevY = tieY;
+  const dx = tipX - tieX;
+  const dy = tipY - tieY;
   for (let i = 1; i <= stemSteps; i++) {
     const t = i / stemSteps;
-    const sway = Math.sin(t * Math.PI * 1.3 + seed) * 10 * scale * (1 - t * 0.4);
-    const x = baseX + sway;
-    const y = baseY - stemHeight * t;
+    // ease so the stem leaves the tie point tightly, then spreads toward the bloom
+    const eased = t * t * (3 - 2 * t);
+    const sway = Math.sin(t * Math.PI * 1.6 + seed) * 6 * scale * Math.sin(t * Math.PI);
+    const perpX = -dy / Math.hypot(dx, dy) || 0;
+    const x = tieX + dx * eased + sway * perpX;
+    const y = tieY + dy * eased;
     segments.push({ x1: prevX, y1: prevY, x2: x, y2: y, color: stemColor, width: Math.max(2.2 * scale, 1.4) });
     prevX = x; prevY = y;
   }
-  const bloomCenter = { x: prevX, y: prevY };
+  const bloomCenter = { x: tipX, y: tipY };
 
   // leaves: two small curved leaves partway up the stem, angled outward
-  // and away from the stem line so both sides read clearly
-  const leafAtT = 0.42;
-  const leafBase = { x: baseX + Math.sin(leafAtT * Math.PI * 1.3 + seed) * 10 * scale * (1 - leafAtT * 0.4), y: baseY - stemHeight * leafAtT };
+  const leafAtT = 0.48;
+  const leafEased = leafAtT * leafAtT * (3 - 2 * leafAtT);
+  const leafBase = { x: tieX + dx * leafEased, y: tieY + dy * leafEased };
   [-1, 1].forEach((side) => {
     const leafSteps = 10;
     let lx = leafBase.x, ly = leafBase.y;
@@ -127,34 +132,36 @@ function buildFlower(baseX, baseY, scale, colorSet, seed) {
 }
 
 // ---------- garden state ----------
-let plantedFlowers = []; // { baseX, baseY, scale, colorSet, seed }
+let plantedFlowers = []; // { tipX, tipY, scale, colorSet, seed, angle }
 const MAX_FLOWERS = 6;
 
-function randomBaseX() {
-  const margin = 0.12;
-  const minGap = cw * 0.13;
-  let attempt;
-  let tries = 0;
-  do {
-    attempt = cw * (margin + Math.random() * (1 - margin * 2));
-    tries++;
-  } while (
-    tries < 12 &&
-    plantedFlowers.some(f => Math.abs(f.baseX - attempt) < minGap)
-  );
-  return attempt;
-}
+// bouquet fan-out: each new flower gets an angle spreading from the
+// tie point, like stems gathered in a hand. Order plant order left-to-right
+// across a fan so it always reads as one held bunch.
+const FAN_ANGLES = [-38, -22, -7, 7, 22, 38]; // degrees from vertical, tip lands here
+const FAN_ORDER = [2, 3, 1, 4, 0, 5]; // plant center-out for a natural build-up
 
 function plantFlower() {
   if (plantedFlowers.length >= MAX_FLOWERS) return;
 
-  const groundY = ch * 0.72; // matches the CSS gradient split
-  const baseX = randomBaseX();
-  const scale = 0.75 + Math.random() * 0.55;
-  const colorSet = petalColors[Math.floor(Math.random() * petalColors.length)];
-  const seed = plantedFlowers.length + Math.floor(Math.random() * 4);
+  const groundY = ch * 0.68; // matches the CSS gradient split
+  const tieX = cw * 0.5;
+  const tieY = groundY + ch * 0.03; // stems gather just below the soil line
 
-  const flower = { baseX, baseY: groundY, scale, colorSet, seed };
+  const index = plantedFlowers.length;
+  const slot = FAN_ORDER[index];
+  const angleDeg = FAN_ANGLES[slot];
+  const angleRad = (angleDeg * Math.PI) / 180;
+
+  const stemLength = (150 + Math.random() * 24) * (0.92 + Math.random() * 0.16);
+  const tipX = tieX + Math.sin(angleRad) * stemLength * 0.62;
+  const tipY = tieY - Math.cos(angleRad) * stemLength;
+
+  const scale = 0.72 + Math.random() * 0.34;
+  const colorSet = petalColors[Math.floor(Math.random() * petalColors.length)];
+  const seed = index + Math.floor(Math.random() * 4);
+
+  const flower = { tieX, tieY, tipX, tipY, scale, colorSet, seed };
   plantedFlowers.push(flower);
 
   animateFlower(flower);
@@ -162,7 +169,7 @@ function plantFlower() {
 }
 
 function animateFlower(flower) {
-  const built = buildFlower(flower.baseX, flower.baseY, flower.scale, flower.colorSet, flower.seed);
+  const built = buildFlower(flower.tieX, flower.tieY, flower.tipX, flower.tipY, flower.scale, flower.colorSet, flower.seed);
   const segs = built.segments;
   const total = segs.length;
   const durationMs = 1400;
@@ -202,9 +209,29 @@ function drawSegments(segs) {
 
 function redrawAll() {
   ctx.clearRect(0, 0, cw, ch);
+
+  // draw a little ribbon knot at the tie point once at least one flower exists
+  if (plantedFlowers.length > 0) {
+    const tie = plantedFlowers[0];
+    ctx.save();
+    ctx.translate(tie.tieX, tie.tieY);
+    ctx.fillStyle = '#FF9EB5';
+    ctx.beginPath();
+    ctx.ellipse(-10, 0, 13, 8, 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(10, 0, 13, 8, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#E8779A';
+    ctx.beginPath();
+    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   plantedFlowers.forEach(f => {
     if (f.grown) {
-      const built = buildFlower(f.baseX, f.baseY, f.scale, f.colorSet, f.seed);
+      const built = buildFlower(f.tieX, f.tieY, f.tipX, f.tipY, f.scale, f.colorSet, f.seed);
       drawSegments(built.segments);
       ctx.beginPath();
       ctx.arc(built.centerDot.x, built.centerDot.y, built.centerDot.r, 0, Math.PI * 2);
