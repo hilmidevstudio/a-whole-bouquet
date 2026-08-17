@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>a little garden</title>
+<meta name="description" content="grown just for you" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Caveat:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="sky">
+  <div class="cloud cloud-1"></div>
+  <div class="cloud cloud-2"></div>
+  <div class="cloud cloud-3"></div>
+</div>
+
+<main>
+  <header class="header">
+    <p class="tag">a little garden, grown just for you</p>
+    <h1 class="title">for Awa <span class="wiggle">🌷</span></h1>
+  </header>
+
+  <div class="canvas-wrap">
+    <canvas id="garden" width="900" height="700"></canvas>
+    <div class="ground"></div>
+  </div>
+
+  <div class="controls">
+    <button class="grow-btn" id="grow-btn">
+      <span class="btn-icon">🌱</span>
+      <span id="grow-btn-label">plant a flower</span>
+    </button>
+    <button class="reset-btn" id="reset-btn" title="clear the garden">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 12a9 9 0 1 0 3-6.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M3 4v5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+
+  <p class="hint" id="hint">tap the button, watch something grow</p>
+</main>
+
+<script src="script.js"></script>
+</body>
+</html>
