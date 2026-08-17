@@ -134,6 +134,7 @@ function buildFlower(tieX, tieY, tipX, tipY, scale, colorSet, seed) {
 // ---------- garden state ----------
 let plantedFlowers = []; // { tipX, tipY, scale, colorSet, seed, angle }
 const MAX_FLOWERS = 6;
+let skyProgress = 0; // 0 = hidden, 1 = fully shown
 
 // bouquet fan-out: each new flower gets an angle spreading from the
 // tie point, like stems gathered in a hand. Order plant order left-to-right
@@ -190,6 +191,27 @@ function animateFlower(flower) {
       // finished — draw fully including center dot, then persist as "grown"
       flower.grown = true;
       redrawAll();
+
+      // once the very last flower in the bouquet finishes growing,
+      // bring in the sun and clouds with a gentle fade
+      if (plantedFlowers.length >= MAX_FLOWERS) {
+        animateSkyIn();
+      }
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+function animateSkyIn() {
+  const durationMs = 900;
+  const start = performance.now();
+
+  function step(now) {
+    const elapsed = now - start;
+    skyProgress = Math.min(1, elapsed / durationMs);
+    redrawAll();
+    if (skyProgress < 1) {
+      requestAnimationFrame(step);
     }
   }
   requestAnimationFrame(step);
@@ -207,8 +229,75 @@ function drawSegments(segs) {
   });
 }
 
+function drawSky() {
+  if (skyProgress <= 0) return;
+
+  ctx.save();
+  ctx.globalAlpha = skyProgress;
+
+  // sun — top corner, soft rays
+  const sunX = cw * 0.78;
+  const sunY = ch * 0.15;
+  const sunR = Math.min(cw, ch) * 0.075;
+
+  ctx.fillStyle = '#FFC93C';
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = '#FFC93C';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const r1 = sunR * 1.35;
+    const r2 = sunR * 1.7;
+    ctx.beginPath();
+    ctx.moveTo(sunX + Math.cos(a) * r1, sunY + Math.sin(a) * r1);
+    ctx.lineTo(sunX + Math.cos(a) * r2, sunY + Math.sin(a) * r2);
+    ctx.stroke();
+  }
+
+  // simple face on the sun, just for warmth
+  ctx.fillStyle = '#B9700E';
+  ctx.beginPath();
+  ctx.arc(sunX - sunR * 0.3, sunY - sunR * 0.05, sunR * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(sunX + sunR * 0.3, sunY - sunR * 0.05, sunR * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(sunX, sunY + sunR * 0.18, sunR * 0.32, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.strokeStyle = '#B9700E';
+  ctx.lineWidth = sunR * 0.09;
+  ctx.stroke();
+
+  // clouds — a couple of soft puff clusters
+  function puffCloud(cx, cy, s) {
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    const puffs = [
+      { dx: -0.9, dy: 0.1, r: 0.55 },
+      { dx: -0.25, dy: -0.15, r: 0.7 },
+      { dx: 0.4, dy: 0.05, r: 0.6 },
+      { dx: 0.95, dy: 0.15, r: 0.45 },
+    ];
+    puffs.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(cx + p.dx * s, cy + p.dy * s, p.r * s, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  puffCloud(cw * 0.24, ch * 0.13, Math.min(cw, ch) * 0.055);
+  puffCloud(cw * 0.5, ch * 0.09, Math.min(cw, ch) * 0.04);
+
+  ctx.restore();
+}
+
 function redrawAll() {
   ctx.clearRect(0, 0, cw, ch);
+
+  drawSky();
 
   // draw a little ribbon knot at the tie point once at least one flower exists
   if (plantedFlowers.length > 0) {
@@ -260,6 +349,7 @@ growBtn.addEventListener('click', plantFlower);
 
 resetBtn.addEventListener('click', () => {
   plantedFlowers = [];
+  skyProgress = 0;
   redrawAll();
   updateHintAndButton();
 });
